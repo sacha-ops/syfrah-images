@@ -1,14 +1,16 @@
 name: Build Images
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       images:
-        description: 'Comma-separated image names (or "all")'
+        description: 'Images to build (comma-separated or "all")'
         default: 'all'
         type: string
   schedule:
-    - cron: '0 4 1 * *'  # First of every month at 4am UTC
+    - cron: '0 4 1 * *'
 
 jobs:
   build:
@@ -16,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu-24.04, ubuntu-24.10, alpine-3.20, debian-12]
+        image: [alpine-3.20]
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +36,7 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-utils libguestfs-tools jq
+          sudo apt-get install -y qemu-utils jq
 
       - name: Build image
         if: steps.check.outputs.skip != 'true'
@@ -46,9 +48,7 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: |
           OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
-          # Verify .raw.gz exists
           test -f "$OUTPUT_DIR/${{ matrix.image }}.raw.gz"
-          # Verify it decompresses without error
           gunzip -t "$OUTPUT_DIR/${{ matrix.image }}.raw.gz"
           echo "Artifact verified: ${{ matrix.image }}.raw.gz ($(du -h "$OUTPUT_DIR/${{ matrix.image }}.raw.gz" | cut -f1))"
 
@@ -120,17 +120,14 @@ jobs:
 
       - name: Validate catalog
         run: |
-          # catalog.json is valid JSON
           jq '.' output/catalog.json > /dev/null
           echo "catalog.json is valid JSON"
 
-          # All files referenced in catalog exist
           for file in $(jq -r '.images[].file' output/catalog.json); do
             test -f "output/$file" || { echo "ERROR: $file not found"; exit 1; }
             echo "  OK: $file exists"
           done
 
-          # All SHA256 in catalog match actual files
           for row in $(jq -r '.images[] | "\(.file):\(.sha256)"' output/catalog.json); do
             FILE="${row%%:*}"
             EXPECTED="${row#*:}"
@@ -151,7 +148,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="images-v${{ github.run_number }}"
-          BODY="Pre-built VM images and kernel for Syfrah compute layer.
+          BODY=$(cat <<BODY_EOF
+          Pre-built VM images and kernel for Syfrah compute layer.
 
           **Images:**
           $(jq -r '.images[] | "- \(.name) (\(.arch), \(.size_mb) MB, cloud-init: \(.cloud_init))"' output/catalog.json)
@@ -160,8 +158,10 @@ jobs:
 
           **Usage:**
           \`\`\`
-          syfrah compute image pull ubuntu-24.10
-          \`\`\`"
+          syfrah compute image pull alpine-3.20
+          \`\`\`
+          BODY_EOF
+          )
 
           gh release create "$TAG" \
             --title "Syfrah Images $TAG" \

@@ -1,8 +1,8 @@
 {
-  "source": "cloud-hypervisor",
-  "source_url": "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v43.0/hypervisor-fw",
+  "source": "cloud-hypervisor/rust-hypervisor-firmware",
+  "source_url": "https://github.com/cloud-hypervisor/rust-hypervisor-firmware/releases/download/0.5.0/hypervisor-fw",
   "source_sha256": "UPDATE_WITH_ACTUAL_SHA256_AFTER_FIRST_DOWNLOAD",
-  "version": "6.2-ch",
+  "version": "0.5.0-rhf",
   "arch": "amd64",
-  "note": "Cloud Hypervisor firmware for direct boot. If a vmlinux ELF is needed instead of firmware, update source_url to point to the correct asset."
+  "note": "Cloud Hypervisor firmware (rust-hypervisor-firmware) for direct boot. This is a PVH firmware blob used by Cloud Hypervisor --firmware flag."
 }

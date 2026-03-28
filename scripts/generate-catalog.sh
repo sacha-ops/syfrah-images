@@ -97,7 +97,7 @@ if [ -f "$OUTPUT_DIR/vmlinux.gz" ]; then
             name: "vmlinux",
             version: $version,
             arch: $arch,
-            format: "elf",
+            format: "firmware",
             compression: "gzip",
             sha256: $sha256,
             file: "vmlinux.gz"

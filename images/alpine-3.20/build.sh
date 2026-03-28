@@ -8,7 +8,6 @@ IMAGE_NAME=$(jq -r '.name' "$METADATA")
 SOURCE_URL=$(jq -r '.source_url' "$METADATA")
 EXPECTED_SHA=$(jq -r '.source_sha256' "$METADATA")
 SOURCE_FORMAT=$(jq -r '.source_format' "$METADATA")
-CLOUD_INIT=$(jq -r '.cloud_init' "$METADATA")
 
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/output}"
 mkdir -p "$OUTPUT_DIR"
@@ -46,9 +45,10 @@ else
     exit 1
 fi
 
-# Customize (Alpine does not use cloud-init by default)
-echo "Customizing image..."
-sudo bash "$REPO_ROOT/scripts/customize-image.sh" "$OUTPUT_DIR/${IMAGE_NAME}.raw" "$CLOUD_INIT"
+# Skip customization for cloud images that already ship with cloud-init.
+# The generic Alpine cloud image includes cloud-init with NoCloud support
+# out of the box, so no mount+chroot step is needed.
+echo "Skipping customization (cloud image already configured)."
 
 # Compress
 echo "Compressing..."
