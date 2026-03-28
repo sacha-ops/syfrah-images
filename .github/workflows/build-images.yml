@@ -36,27 +36,45 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-utils jq
+          sudo apt-get install -y qemu-utils jq skopeo
 
-      - name: Build image
+      - name: Build VM image
         if: steps.check.outputs.skip != 'true'
         run: |
           export OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
           bash images/${{ matrix.image }}/build.sh
 
-      - name: Verify artifact
+      - name: Build container image
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          export OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
+          if [ -f "images/${{ matrix.image }}/build-container.sh" ]; then
+            cd "images/${{ matrix.image }}"
+            bash build-container.sh
+            mv output/*-oci.tar.gz "$OUTPUT_DIR/" || true
+          else
+            echo "No container build script for ${{ matrix.image }}, skipping"
+          fi
+
+      - name: Verify artifacts
         if: steps.check.outputs.skip != 'true'
         run: |
           OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
           test -f "$OUTPUT_DIR/${{ matrix.image }}.raw.gz"
           gunzip -t "$OUTPUT_DIR/${{ matrix.image }}.raw.gz"
-          echo "Artifact verified: ${{ matrix.image }}.raw.gz ($(du -h "$OUTPUT_DIR/${{ matrix.image }}.raw.gz" | cut -f1))"
+          echo "VM artifact verified: ${{ matrix.image }}.raw.gz ($(du -h "$OUTPUT_DIR/${{ matrix.image }}.raw.gz" | cut -f1))"
+          if [ -f "$OUTPUT_DIR/${{ matrix.image }}-oci.tar.gz" ]; then
+            gunzip -t "$OUTPUT_DIR/${{ matrix.image }}-oci.tar.gz"
+            echo "Container artifact verified: ${{ matrix.image }}-oci.tar.gz ($(du -h "$OUTPUT_DIR/${{ matrix.image }}-oci.tar.gz" | cut -f1))"
+          fi
 
       - uses: actions/upload-artifact@v4
         if: steps.check.outputs.skip != 'true'
         with:
           name: ${{ matrix.image }}
-          path: output/${{ matrix.image }}.raw.gz
+          path: |
+            output/${{ matrix.image }}.raw.gz
+            output/${{ matrix.image }}-oci.tar.gz
           retention-days: 7
 
   kernel:
@@ -116,6 +134,9 @@ jobs:
         run: |
           cd output
           sha256sum *.raw.gz vmlinux.gz catalog.json > SHA256SUMS.txt
+          if ls *-oci.tar.gz 1>/dev/null 2>&1; then
+            sha256sum *-oci.tar.gz >> SHA256SUMS.txt
+          fi
           cat SHA256SUMS.txt
 
       - name: Validate catalog
@@ -141,6 +162,19 @@ jobs:
             echo "  OK: $FILE SHA256 matches"
           done
 
+          # Validate container files if present
+          for row in $(jq -r '.images[] | select(.container_file != null) | "\(.container_file):\(.container_sha256)"' output/catalog.json); do
+            FILE="${row%%:*}"
+            EXPECTED="${row#*:}"
+            test -f "output/$FILE" || { echo "ERROR: container file $FILE not found"; exit 1; }
+            ACTUAL=$(gunzip -c "output/$FILE" | sha256sum | awk '{print $1}')
+            if [ "$EXPECTED" != "$ACTUAL" ]; then
+              echo "ERROR: container SHA256 mismatch for $FILE"
+              exit 1
+            fi
+            echo "  OK: $FILE container SHA256 matches"
+          done
+
           echo "Catalog validation passed"
 
       - name: Create Release
@@ -163,10 +197,12 @@ jobs:
           BODY_EOF
           )
 
+          ASSETS=(output/*.raw.gz output/vmlinux.gz output/catalog.json output/SHA256SUMS.txt)
+          if ls output/*-oci.tar.gz 1>/dev/null 2>&1; then
+            ASSETS+=(output/*-oci.tar.gz)
+          fi
+
           gh release create "$TAG" \
             --title "Syfrah Images $TAG" \
             --notes "$BODY" \
-            output/*.raw.gz \
-            output/vmlinux.gz \
-            output/catalog.json \
-            output/SHA256SUMS.txt
+            "${ASSETS[@]}"
