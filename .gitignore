@@ -1,0 +1,13 @@
+# Built artifacts
+*.raw
+*.raw.gz
+*.img
+*.qcow2
+*.gz
+!catalog-template.json
+output/
+target/
+
+# OS
+.DS_Store
+Thumbs.db

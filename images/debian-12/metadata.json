@@ -1,0 +1,14 @@
+{
+  "name": "debian-12",
+  "source_url": "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.raw",
+  "source_sha256": "UPDATE_WITH_ACTUAL_SHA256_AFTER_FIRST_DOWNLOAD",
+  "source_format": "raw",
+  "arch": "amd64",
+  "os_family": "linux",
+  "variant": "minimal",
+  "boot_mode": "direct-kernel",
+  "cloud_init": true,
+  "default_username": "debian",
+  "rootfs_fs": "ext4",
+  "min_disk_mb": 2048
+}

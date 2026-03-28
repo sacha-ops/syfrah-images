@@ -1,0 +1,14 @@
+{
+  "name": "ubuntu-24.04",
+  "source_url": "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img",
+  "source_sha256": "UPDATE_WITH_ACTUAL_SHA256_AFTER_FIRST_DOWNLOAD",
+  "source_format": "qcow2",
+  "arch": "amd64",
+  "os_family": "linux",
+  "variant": "minimal",
+  "boot_mode": "direct-kernel",
+  "cloud_init": true,
+  "default_username": "ubuntu",
+  "rootfs_fs": "ext4",
+  "min_disk_mb": 2048
+}

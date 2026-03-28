@@ -1,0 +1,14 @@
+{
+  "name": "alpine-3.20",
+  "source_url": "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.6-x86_64-bios-cloudinit-r0.qcow2",
+  "source_sha256": "UPDATE_WITH_ACTUAL_SHA256_AFTER_FIRST_DOWNLOAD",
+  "source_format": "qcow2",
+  "arch": "amd64",
+  "os_family": "linux",
+  "variant": "minimal",
+  "boot_mode": "direct-kernel",
+  "cloud_init": false,
+  "default_username": "alpine",
+  "rootfs_fs": "ext4",
+  "min_disk_mb": 512
+}

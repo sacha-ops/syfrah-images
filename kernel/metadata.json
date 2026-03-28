@@ -1,0 +1,8 @@
+{
+  "source": "cloud-hypervisor",
+  "source_url": "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v43.0/hypervisor-fw",
+  "source_sha256": "UPDATE_WITH_ACTUAL_SHA256_AFTER_FIRST_DOWNLOAD",
+  "version": "6.2-ch",
+  "arch": "amd64",
+  "note": "Cloud Hypervisor firmware for direct boot. If a vmlinux ELF is needed instead of firmware, update source_url to point to the correct asset."
+}

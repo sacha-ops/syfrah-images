@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "base_url": "https://github.com/sacha-ops/syfrah-images/releases/download/RELEASE_TAG",
+  "images": [
+    {
+      "name": "IMAGE_NAME",
+      "arch": "amd64",
+      "os_family": "linux",
+      "variant": "minimal",
+      "format": "raw",
+      "compression": "gzip",
+      "boot_mode": "direct-kernel",
+      "sha256": "SHA256_OF_DECOMPRESSED_RAW",
+      "size_mb": 0,
+      "min_disk_mb": 2048,
+      "cloud_init": true,
+      "default_username": "DEFAULT_USER",
+      "rootfs_fs": "ext4",
+      "source_kind": "official",
+      "file": "IMAGE_NAME.raw.gz"
+    }
+  ],
+  "kernel": {
+    "name": "vmlinux",
+    "version": "VERSION",
+    "arch": "amd64",
+    "format": "elf",
+    "compression": "gzip",
+    "sha256": "SHA256_OF_DECOMPRESSED_VMLINUX",
+    "file": "vmlinux.gz"
+  }
+}
