@@ -1,0 +1,172 @@
+name: Build Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      images:
+        description: 'Comma-separated image names (or "all")'
+        default: 'all'
+        type: string
+  schedule:
+    - cron: '0 4 1 * *'  # First of every month at 4am UTC
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-24.10, alpine-3.20, debian-12]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if image should be built
+        id: check
+        run: |
+          INPUT="${{ github.event.inputs.images || 'all' }}"
+          if [ "$INPUT" = "all" ] || echo "$INPUT" | grep -q "${{ matrix.image }}"; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install tools
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-utils libguestfs-tools jq
+
+      - name: Build image
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          export OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
+          bash images/${{ matrix.image }}/build.sh
+
+      - name: Verify artifact
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
+          # Verify .raw.gz exists
+          test -f "$OUTPUT_DIR/${{ matrix.image }}.raw.gz"
+          # Verify it decompresses without error
+          gunzip -t "$OUTPUT_DIR/${{ matrix.image }}.raw.gz"
+          echo "Artifact verified: ${{ matrix.image }}.raw.gz ($(du -h "$OUTPUT_DIR/${{ matrix.image }}.raw.gz" | cut -f1))"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          name: ${{ matrix.image }}
+          path: output/${{ matrix.image }}.raw.gz
+          retention-days: 7
+
+  kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Build kernel
+        run: |
+          export OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
+          bash kernel/build.sh
+
+      - name: Verify kernel
+        run: |
+          OUTPUT_DIR="${GITHUB_WORKSPACE}/output"
+          test -f "$OUTPUT_DIR/vmlinux.gz"
+          gunzip -t "$OUTPUT_DIR/vmlinux.gz"
+          gunzip -k -f "$OUTPUT_DIR/vmlinux.gz"
+          file "$OUTPUT_DIR/vmlinux"
+          echo "Kernel artifact verified: vmlinux.gz ($(du -h "$OUTPUT_DIR/vmlinux.gz" | cut -f1))"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel
+          path: output/vmlinux.gz
+          retention-days: 7
+
+  publish:
+    needs: [build, kernel]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: output
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh output/
+
+      - name: Generate catalog
+        run: |
+          TAG="images-v${{ github.run_number }}"
+          bash scripts/generate-catalog.sh output "$TAG"
+
+      - name: Generate checksums
+        run: |
+          cd output
+          sha256sum *.raw.gz vmlinux.gz catalog.json > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Validate catalog
+        run: |
+          # catalog.json is valid JSON
+          jq '.' output/catalog.json > /dev/null
+          echo "catalog.json is valid JSON"
+
+          # All files referenced in catalog exist
+          for file in $(jq -r '.images[].file' output/catalog.json); do
+            test -f "output/$file" || { echo "ERROR: $file not found"; exit 1; }
+            echo "  OK: $file exists"
+          done
+
+          # All SHA256 in catalog match actual files
+          for row in $(jq -r '.images[] | "\(.file):\(.sha256)"' output/catalog.json); do
+            FILE="${row%%:*}"
+            EXPECTED="${row#*:}"
+            ACTUAL=$(gunzip -c "output/$FILE" | sha256sum | awk '{print $1}')
+            if [ "$EXPECTED" != "$ACTUAL" ]; then
+              echo "ERROR: SHA256 mismatch for $FILE"
+              echo "  Expected: $EXPECTED"
+              echo "  Actual:   $ACTUAL"
+              exit 1
+            fi
+            echo "  OK: $FILE SHA256 matches"
+          done
+
+          echo "Catalog validation passed"
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="images-v${{ github.run_number }}"
+          BODY="Pre-built VM images and kernel for Syfrah compute layer.
+
+          **Images:**
+          $(jq -r '.images[] | "- \(.name) (\(.arch), \(.size_mb) MB, cloud-init: \(.cloud_init))"' output/catalog.json)
+
+          **Kernel:** $(jq -r '.kernel.version' output/catalog.json)
+
+          **Usage:**
+          \`\`\`
+          syfrah compute image pull ubuntu-24.10
+          \`\`\`"
+
+          gh release create "$TAG" \
+            --title "Syfrah Images $TAG" \
+            --notes "$BODY" \
+            output/*.raw.gz \
+            output/vmlinux.gz \
+            output/catalog.json \
+            output/SHA256SUMS.txt
