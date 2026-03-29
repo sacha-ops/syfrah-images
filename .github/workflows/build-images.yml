@@ -167,7 +167,7 @@ jobs:
             FILE="${row%%:*}"
             EXPECTED="${row#*:}"
             test -f "output/$FILE" || { echo "ERROR: container file $FILE not found"; exit 1; }
-            ACTUAL=$(gunzip -c "output/$FILE" | sha256sum | awk '{print $1}')
+            ACTUAL=$(sha256sum "output/$FILE" | awk '{print $1}')
             if [ "$EXPECTED" != "$ACTUAL" ]; then
               echo "ERROR: container SHA256 mismatch for $FILE"
               exit 1
