@@ -43,7 +43,7 @@ for meta_file in "$REPO_ROOT"/images/*/metadata.json; do
     CONTAINER_SHA256="null"
     if [ -f "$OCI_GZ" ]; then
         CONTAINER_FILE="${IMAGE_NAME}-oci.tar.gz"
-        CONTAINER_SHA256=$(gunzip -c "$OCI_GZ" | sha256sum | awk '{print $1}')
+        CONTAINER_SHA256=$(sha256sum "$OCI_GZ" | awk '{print $1}')
         echo "    Container variant found: $CONTAINER_FILE"
     fi
 
